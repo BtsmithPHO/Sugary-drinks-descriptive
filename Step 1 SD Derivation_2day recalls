@@ -1,0 +1,735 @@
+/*******************************************************
+Nutrition Inequities in CVD Grant
+Objective: SSB consumption and excise taxation
+********************************************************/
+
+libname cchs '\\OTO101PFILE01V.oahpp.ca\Christine.Warren$\Data\CCHS Data\CCHS 2015 - Nutrition\datasets\PUMF';run;
+
+libname output '\\OTO101PFILE01V.oahpp.ca\Christine.Warren$\Research Projects\Nutrition_CVD_SugaryDrinks\Analysis\cchsn_output_datasets';run; *to put 'permanent' datasets to work off of in different programs;
+
+/********************************
+Step 1 - create SCB Variable code
+*********************************/
+
+
+/***********************************************************
+************ append FID with FRL file **********************
+************************************************************/
+
+data FID_file;
+	set cchs.FID;
+run;
+
+
+data FRL_file;
+	set cchs.FRL;
+run;
+
+
+proc datasets;
+	append base=FID_file
+	data=FRL_file;
+run;
+
+
+data FID_FRL;
+	set FID_file;
+run;
+
+
+/* sort FID_FRL */
+proc sort data= FID_FRL; by ADM_RNO SUPPID SEQID; run;
+
+data FID_FRL; 
+	set FID_FRL;
+run;
+
+
+
+/*******************************************************************
+Remove double counting from appended file***************************
+********************************************************************/
+data FID_FRL;
+	set FID_FRL;
+	double=0;
+	if FID_CDE = FID_RC1 then double=1; 
+	if FID_CDE = FID_RC2 then double=1; 
+	if FID_CDE = FID_RC3 then double=1; 
+run;
+
+proc freq data=FID_FRL;
+	table double;
+run;
+
+data FID_FRL;
+	set FID_FRL (where=(double=0));
+run;
+
+/*data set with no double counting*/
+
+data FID_FRL;
+	set FID_FRL;
+	if FID_RC1=9999996 and FID_RC2=9999996 and FID_RC3=9999996 then CDE_NEW=FID_CDE; else 
+	/*take out sugary drinks from alcoholic beverages*/
+	if FID_RC1 in (2835 2841 2842 2843 2844 2845 2846 2848 2849 2850 2851 2852 2924 2925 2936 2937 2943 2952 2966
+	2977 2978 5294 5552 5611 6705 6707 7182 403959 502486 502487 502488 502489 502490 502491 502492 502493 502494 502495 502496
+	502497 502498 502499 502500 502501 502502 502503 502504 502505 502506 502507 502508 502509 502510 502511 502512 502513 502514
+	502515 502516 502517 502518 502519 502520 502521 502522 504148 504224 504268 504390 504412 505192 505193 505194 505195 505196
+	505197 505198 505199 505200 505201 505202) then CDE_NEW=FID_CDE; else 
+	if FID_RC1 ne 9999996 then CDE_NEW=FID_RC1; 
+
+run;
+
+
+
+
+/**************************************************************************************************
+CREATING SCB variables ****************************************************************************
+***************************************************************************************************/
+
+data SCB_FID_FRL; 
+	set FID_FRL;
+
+	SSB=0; FREESUG=0; SCB=0; SUGARFRUIT=0; SUGARMILK=0; SUGARPOP=0; SUGARCOFFEE=0; SUGARTEA=0; SUGARSPORTS=0; 
+	SUGARENERGY=0; SUGARVITAMINWATER=0; SUGARPLANT=0; SUGARYOGURT=0; SUGARSMOOTHIE=0; SUGARHOTCHOC=0;
+	SSBCAT=0;
+
+*account for missing weight and energy information;
+	if fid_sug in(99999.999995,99999.999999) then fid_sug=.;
+	if fid_wtg = 99999.999999 then fid_wtg=.;
+	if fid_ekc in(99999.999995,99999.999999) then fid_ekc=.;
+
+/****** 100% fruit juice ******/
+/* var name: FREESUG (1 - yes, 0 - no)*/
+
+	if CDE_NEW in 
+	(1485 1495 1497 1572 1576 1589 1590 1591 1594 1595 1619 1620 1622 1624 1631 1632 1657 1659 1673 1716 1723 1725 1752 1754 2312 2464 2473
+	2868 5287 5389 5472 5586 5593 6203 6287 6440 6660 6661 7051 7224 7419 7421 7573 404283 501855 501857 501862 501866 501927 502123 504002
+	504189 504190 504388 504477 504478 504731 504732 505135)
+
+
+	then do; FREESUG=1; end;
+	else do; FREESUG=0; end;
+
+/****** SUGAR SWEETENED FRUIT DRINK ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARFRUIT (1 - fruit drink, 0 - not fruit drink)
+var name: SSBCAT=1*/
+
+	if CDE_NEW in 
+	(1570 1625 1629 1644 1652 1694 1717 1720 2885 2889 2893 2895 2904 2922 2940 2954 2955 2956 2958 2959 2960 2961 2965 2967 2968 2969 2972 2974 2976 2981 2983
+	5424 5628 6204 6205 6437 6470 6662 7055 7070 7230 404292 501853 501935 501936 501937 501940 501941 502464 502465 502468 502469 502470 502472 502479 502480
+	504387 504510 504558 504686 504733 504734 504735 505134 505188 505189)
+
+	then do; SSB=1; SUGARFRUIT=1; SSBCAT=1; end; 
+	else do SUGARFRUIT=0; end; 
+
+/****** SUGAR SWEETENED MILK ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARMILK (1 - milk drink, 0 - not milk drink)
+var name SSBCAT=2*/
+
+	if CDE_NEW in 
+	(55 69 70 75 76 2863 2865 2899 2896 2900 2903 2905 2906 2908 2932 4711 5268 5269 5273 5275 5276 5589 6636 500024 500025 500026 500027 500035 500036
+	500037 500038 500039 500040 500041 500042 500043 500064 500065 502759 502760 502770 502783 502784 504172 504173 504359 504695 504696 504974
+	504976 504977 504978 504979 504980)
+
+
+	then do; SSB=1; SUGARMILK=1; SSBCAT=2; end; 
+	else do; SUGARMILK=0; end; 
+
+/****** SUGAR SWEETENED SODA ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARPOP (1 - soft drink, 0 - not soft drink)
+var name: SSBCAT=3
+*/
+	if CDE_NEW in 
+	(2854 2855 2856 2857 2858 2859 2860 2861 2920 4980 5288 5293 7429)
+
+	then do; SSB=1; SUGARPOP=1; SSBCAT=3; end; 
+	else do; SUGARPOP=0; end; 
+
+/****** SUGAR SWEETENED COFFEE ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARCOFFEE (1 - coffee drink, 0 - not coffee drink)
+var name: SSBCAT=4
+*/
+
+	if CDE_NEW in 
+	(2928 2929 2930 502439 502440 502441 504363 504386 504722 504729 504847 505183)
+
+	then do; SSB=1; SUGARCOFFEE=1; SSBCAT=4; end; 
+	else do; SUGARCOFFEE=0;end; 
+
+/****** SUGAR SWEETENED TEA ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARTEA (1 - tea drink, 0 - not tea drink)
+var name: SSBCAT=5
+*/
+
+	if CDE_NEW in 
+	(2914 2915 4908 5291 6703 502452 502453 502454 502456 504730)
+
+	then do; SSB=1; SUGARTEA=1; SSBCAT=5;  end; 
+	else do; SUGARTEA=0; end; 
+
+/****** SUGAR SWEETENED SPORTS DRINK ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARSPORTS (1 - sports drink, 0 - not sports drink)
+var name: SSBCAT=6
+*/
+
+	if CDE_NEW in 
+	(5962 5963)
+
+	then do; SSB=1; SUGARSPORTS=1; SSBCAT=6; end; 
+	else do; SUGARSPORTS=0;end; 
+
+/****** SUGAR SWEETENED ENERGY DRINKS ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARENERGY (1 - energy drink, 0 - not energy drink)
+var name: SSBCAT=7
+*/
+
+	if CDE_NEW in 
+
+	(7176 7178 7173 7179 7175 7180)
+
+	then do; SSB=1; SUGARENERGY=1; SSBCAT=7; end; 
+	else do; SUGARENERGY=0; end; 
+
+/****** SUGAR SWEETENED VITAMIN WATER ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARVITAMINWATER (1 - vitwater drink, 0 - not vitwater drink)
+var name: SSBCAT=8
+*/
+
+	if CDE_NEW in 
+	(7237 7187 7185 7189)
+
+	then do; SSB=1; SUGARVITAMINWATER=1; SSBCAT=8; end; 
+	else do; SUGARVITAMINWATER=0; end; 
+
+/****** SUGAR SWEETENED PLANT-BASED BEV ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARPLANT (1 - plant drink, 0 - not plant drink)
+var name: SSBCAT=9
+*/
+
+	if CDE_NEW in 
+	(4780 5241 5429 6329 6331 6332 6666 6720 6784 7225 7226 7478 7480 7570)
+
+	then do; SSB=1; SUGARPLANT=1; SSBCAT=9; end; 
+	else do SUGARPLANT=0; end; 
+
+/****** SUGAR SWEETENED YOGURT ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARYOGURT (1 - yogurt drink, 0 - not yogurt drink)
+var name: SSBCAT=10
+*/
+
+	if CDE_NEW in
+	(6993 6994 7119 7120)
+
+	then do; SSB=1; SUGARYOGURT=1; SSBCAT=10; end; 
+	else do; SUGARYOGURT=0; end; 
+
+/****** SUGAR SWEETENED SMOOTHIE ******/
+/* var name: SSB (1 - yes, 0- no)
+var name: SUGARSMOOTHIE (1 - smoothie drink, 0 - not smoothie drink)
+var name: SSBCAT=11
+*/
+
+	if CDE_NEW in (504145 504171 504981) 
+	then do; SSB=1; SUGARSMOOTHIE=1; SSBCAT=11; end; 
+	else do; SUGARSMOOTHIE=0; end;
+
+/******* SUGAR SWEETENED HOT CHOCOLATE ******/
+/* var name: SSB (1- yes, 0 -no)
+var name: SUGARHOTCHOC (1 - hot chocolate drink, 0 - not hot chocolate drink)
+var name: SSBCAT=13
+*/
+	if CDE_NEW in(500028 504779)
+	then do; SSB=1; SUGARHOTCHOC=1; SSBCAT=12; end; 
+	else do; SUGARHOTCHOC=0; end;
+
+/******CREATING SCB VAR *********/
+/*var name: SCB (1 - yes, 0- no);*/
+
+	if freesug = 1 or SSB=1 then do; SCB =1; end;
+	else if freesug=0 and SSB=0 then do; SCB=0; end;
+
+
+/**************************************
+	CPE VAR
+	************************************/
+	
+	REGMILK=0; CPE_MILK_ENERGY=0;
+	DIETSODA=0; CPE_DIETSODA_ENERGY=0;
+	DIETDRINKS=0; CPE_DIETDRINKS_ENERGY=0;
+	CPE_ENERGY_TOTAL=0;
+
+
+*MILK;
+	IF CDE_NEW IN (61 63 72 74 77 78 79 80 112 113 114 115 123 124 134
+					140 153 5487 6353 7024 404020 404021 404036 404108
+					500001 500002 500003 500004 500005 500009 500012 504448 504788)
+	THEN DO; REGMILK=1; CPE_MILK_ENERGY=FID_EKC; CPE_ENERGY_TOTAL=FID_EKC; END;
+
+
+*DIET SODA;
+	IF CDE_NEW IN (2853 2926 2938 4979)
+	THEN DO; DIETSODA=1; CPE_DIETSODA_ENERGY=FID_EKC; CPE_ENERGY_TOTAL=FID_EKC; END;
+
+
+*DIET OTHER;
+	IF CDE_NEW IN (2963 5292 5603 6327 6328 7174 7177 7184 7186 7188 7238 403953 502481 505190 505191)
+	THEN DO; DIETDRINKS=1; CPE_DIETDRINKS_ENERGY=FID_EKC; CPE_ENERGY_TOTAL=FID_EKC; END;
+
+RUN;
+
+
+/* SEE HOW MANY PEOPLE CONSUMED IMPUTED ENERGY BEVERAGE 
+DATA SCB_IMPUTE; SET SCB_FID_FRL (WHERE=(CDE_NEW=404292));
+RUN;
+
+DATA MERGED_CHECK;
+	MERGE SCB_IMPUTE (IN=A) Healthsurvey_CHECK (IN=B);
+	BY ADM_RNO;
+	IF A AND B;
+RUN;
+
+DATA MERGED_CHECK;
+	SET MERGED_CHECK;
+	KEEP ADM_RNO CDE_NEW;
+RUN;
+
+PROC PRINT DATA=MERGED_CHECK; RUN;
+*/
+
+
+/************************************************************************** 
+IMPUTE MISSING ENERGY VARIABLE - ADDITIONAL CODE IN 'SCB IMPUTATION' DOC
+***************************************************************************/
+
+data SCB_fid_frl;
+	set SCB_fid_frl;
+	if FID_CDE =404292 then do; E_SUGARFRUITDRINK=0.5416100*fid_wtg; FID_EKC=0.5416100*fid_wtg; end;
+run;
+
+/***************************************************************************
+IMPUTE MISSING SUGAR VARIABLES - ADDITIONAL CODE IN 'SCB IMPUTATION' DOC
+****************************************************************************/
+/* NOTE: ONLY IMPUTED THE 14 MISSING CODES THAT ARE NON-RECIPE LEVEL
+RECIPE LEVEL MISSING TREATED AS 0 BY SC/HC - LIMITATION RE. SURVEY DATA */
+
+data SCB_fid_frl;
+	set SCB_fid_frl;
+	*100% juice;
+	if FID_CDE in (1632 6203 6440 7573)
+ 		then do; FID_SUG=0.079613*fid_wtg; end;
+	*fruit drinks;
+	if FID_CDE in (2885 2955 2958 2976 2981)
+ 		then do; FID_SUG=0.111423*fid_wtg; end;
+	*regular soft drinks;
+	if FID_CDE in (2856 2858 2859)
+ 		then do; FID_SUG=0.104280*fid_wtg; end;
+	*coffee;
+	if FID_CDE in (2929 2930)
+ 		then do; FID_SUG=0.080740*fid_wtg; end;
+
+	*recipe level ingredients in SD, but not considered SD on their own;
+	*BNS 33B;
+	if FID_CDE in (2511)
+		then do; FID_SUG=0.015379*fid_wtg; end;
+
+	if FID_CDE in (2608) 
+		then do; FID_SUG=0.078860*fid_wtg; end;
+
+	if FID_CDE in (2111)
+		then do; FID_SUG=0.036029*fid_wtg; end;
+
+	if FID_CDE in (2454)
+		then do; FID_SUG=0.026591*fid_wtg; end;
+
+	if FID_CDE in (3244)
+		then do; FID_SUG= 0.029211*fid_wtg; end;
+
+	if FID_CDE in (1510 1577)
+		then do; FID_SUG=0.173801*fid_wtg; end;
+
+	if FID_CDE in (1606)
+		then do; FID_SUG=0.069675*fid_wtg; end;
+
+	if FID_CDE in (4331)
+		then do; FID_SUG=0.565199*fid_wtg; end;
+
+	if FID_CDE in (403802)
+		then do; FID_SUG=0.615550*fid_wtg; end;
+
+	if FID_CDE in (2896 2900)
+		then do; FID_SUG=0.329645*fid_wtg; end;
+
+run;
+
+/**************************************************************************************************************
+Prepare energy (FID_EKC) and weight (FID_WTG) and sugar (FID_SUG) variables for specific categories of SSB/SCB
+***************************************************************************************************************/
+
+*double the energy, weight, and sugar variables to create ENERGY=0 and WEIGHT=0 and SUGAR=0 for non-consumers;
+data SCB_FID_FRL;
+	set SCB_FID_FRL;
+
+*create variables for SCB overall;
+
+	if SCB > 0 then do; E_SCB= FID_EKC; W_SCB= FID_WTG; S_SCB= FID_SUG; end; 
+	else if SCB=0 then do; E_SCB=0; W_SCB=0; S_SCB=0; end;
+
+*create variables for freesug;
+	if freesug > 0 then do; E_FREESUG=FID_EKC; W_FREESUG=FID_WTG; S_FREESUG= FID_SUG; end;
+	else if freesug=0 then do;  E_FREESUG=0; W_FREESUG=0; S_FREESUG=0; end;
+
+*create variables for SSB overall;
+
+	if SSB > 0 then do; E_SSB= FID_EKC; W_SSB= FID_WTG; S_SSB= FID_SUG; end; 
+	else if SSB=0 then do; E_SSB=0; W_SSB=0; S_SSB=0; end;
+
+*create variables for SSB sub-groups;
+* 1: sugar-sweetened fruit drink;
+	if SSBCAT=1 then do; E_SUGARFRUITDRINK=FID_EKC; W_SUGARFRUITDRINK=FID_WTG; S_SUGARFRUITDRINK=FID_SUG; end;
+	else if SSBCAT ne 1 then do;E_SUGARFRUITDRINK=0; W_SUGARFRUITDRINK=0; S_SUGARFRUITDRINK=0; end;
+
+* 2: sugar-sweetened milk;
+	if SSBCAT=2 then do; E_SUGARMILK=FID_EKC; W_SUGARMILK=FID_WTG; S_SUGARMILK=FID_SUG; end;
+	else if SSBCAT ne 2 then do E_SUGARMILK=0; W_SUGARMILK=0; S_SUGARMILK=0; end;
+
+* 3: sugar sweetened soda;
+	if SSBCAT=3 then do; E_SUGARPOP= FID_EKC; W_SUGARPOP=FID_WTG; S_SUGARPOP=FID_SUG; end;
+	else if SSBCAT ne 3 then do;E_SUGARPOP=0; W_SUGARPOP=0; S_SUGARPOP=0; end;
+
+* 4: sugar sweetened coffee;
+	if SSBCAT=4 then do; E_SUGARCOFFEE= FID_EKC; W_SUGARCOFFEE=FID_WTG; S_SUGARCOFFEE=FID_SUG; end;
+	else if SSBCAT ne 4 then do; E_SUGARCOFFEE=0; W_SUGARCOFFEE=0; S_SUGARCOFFEE=0; end;
+
+* 5: sugar sweetened tea;
+	if SSBCAT=5 then do; E_SUGARTEA=FID_EKC; W_SUGARTEA=FID_WTG; S_SUGARTEA=FID_SUG; end;
+	else if SSBCAT ne 5 then do; E_SUGARTEA=0; W_SUGARTEA=0; S_SUGARTEA=0; end;
+
+*6: sugar sweetened sports drink;
+	if SSBCAT=6 then do; E_SUGARSPORT=FID_EKC; W_SUGARSPORT=FID_WTG; S_SUGARSPORT=FID_SUG; end;
+	else if SSBCAT ne 6 then do; E_SUGARSPORT=0; W_SUGARSPORT=0; S_SUGARSPORT=0; end;
+
+* 7: sugar sweetened energy drink;
+	if SSBCAT=7 then do; E_SUGARENERGY=FID_EKC; W_SUGARENERGY=FID_WTG; S_SUGARENERGY=FID_SUG; end;
+	else if SSBCAT ne 7 then do; E_SUGARENERGY=0; W_SUGARENERGY=0; S_SUGARENERGY=0; end;
+
+* 8: sugar sweetened vitamin water;
+	if SSBCAT=8 then do; E_SUGARVITAMINWATER=FID_EKC; W_SUGARVITAMINWATER=FID_WTG; S_SUGARVITAMINWATER=FID_SUG; end;
+	else if SSBCAT ne 8 then do; E_SUGARVITAMINWATER=0; W_SUGARVITAMINWATER=0; S_SUGARVITAMINWATER=0; end;
+
+* 9: sugar-sweetened plant based bev;
+	if SSBCAT=9 then do; E_SUGARPLANT=FID_EKC; W_SUGARPLANT=FID_WTG; S_SUGARPLANT=FID_SUG; end;
+	else if SSBCAT ne 9 then do; E_SUGARPLANT=0; W_SUGARPLANT=0; S_SUGARPLANT=0; end;
+
+*10: sugar-sweetened yogurt;
+	if SSBCAT=10 then do; E_SUGARYOGURT=FID_EKC; W_SUGARYOGURT=FID_WTG; S_SUGARYOGURT=FID_SUG; end;
+	else if SSBCAT ne 10 then do; E_SUGARYOGURT=0; W_SUGARYOGURT=0; S_SUGARYOGURT=0; end;
+
+*11: sugar sweetened smoothie;
+	if SSBCAT=11 then do; E_SUGARSMOOTHIE=FID_EKC; W_SUGARSMOOTHIE=FID_WTG; S_SUGARSMOOTHIE=FID_SUG; end;
+	else if SSBCAT ne 11 then do; E_SUGARSMOOTHIE=0; W_SUGARSMOOTHIE=0; S_SUGARSMOOTHIE=0; end;
+
+*12: sugar sweetened hot chocolate;
+	if SSBCAT=12 then do; E_SUGARHOTCHOC=FID_EKC; W_SUGARHOTCHOC=FID_WTG; S_SUGARHOTCHOC=FID_SUG; end;
+	else if SSBCAT ne 13 then do; E_SUGARHOTCHOC=0; W_SUGARHOTCHOC=0; S_SUGARHOTCHOC=0; end;
+
+run;
+*end energy, weight, and sugar var for total SCB, SSB, and based on type of SCB;
+
+/******************************************************************************
+*sum SCB, SSB, ENERGY, WEIGHT, and SUGAR across ADM_RNO and first recall day;
+*******************************************************************************/
+data SCB_FID_FRL_sum; 
+	set SCB_FID_FRL;
+	by ADM_RNO SUPPID; 
+	if ADM_RNO ne ' '; 
+	
+
+	*sum SCB;
+	retain SCB_SUM_count; 
+	retain SCB_sum_energy; 
+	retain SCB_sum_weight; 
+	retain SCB_sum_sugar;
+	if first.suppid then do; SCB_SUM_count=0; SCB_sum_energy=0; SCB_sum_weight=0;SCB_sum_sugar=0; end;
+	SCB_SUM_count =sum(of SCB, SCB_SUM_count);
+	SCB_sum_energy =sum(of SCB_sum_energy, E_SCB); 
+	SCB_sum_weight =sum(of SCB_sum_weight, W_SCB); 
+	SCB_sum_sugar= sum(of SCB_sum_sugar, S_SCB);
+
+
+	
+	*sum SSB;
+	retain SSB_SUM_count;
+	retain SSB_sum_energy; 
+	retain SSB_sum_weight;  
+	retain SSB_sum_sugar;
+	if first.suppid then do; SSB_SUM_count=0; SSB_sum_energy=0; SSB_sum_weight=0; SSB_sum_sugar=0; end;
+	SSB_SUM_count =sum(of SSB, SSB_SUM_count);  
+	SSB_sum_energy =sum(of SSB_sum_energy, E_SSB); 
+	SSB_sum_weight =sum(of SSB_sum_weight, W_SSB); 
+	SSB_sum_sugar= sum(of SSB_sum_sugar, S_SSB);
+
+	/*summing across specific catgories of SCBs*/
+
+	retain freesug_sum_count;
+	retain freesug_sum_energy;
+	retain freesug_sum_weight;
+	retain freesug_sum_sugar;
+	if first.suppid then do; freesug_sum_count=0; freesug_sum_energy=0; freesug_sum_weight=0; freesug_sum_sugar=0 ;end;
+	freesug_sum_count = sum(of FREESUG, freesug_sum_count);
+	freesug_sum_energy= sum(of E_freesug, freesug_sum_energy);
+	freesug_sum_weight= sum(of W_freesug, freesug_sum_weight);
+	freesug_sum_sugar= sum(of S_freesug, freesug_sum_sugar); 
+
+	retain fruitdrink_sum_count;
+	retain fruitdrink_sum_energy;
+	retain fruitdrink_sum_weight;
+	retain fruitdrink_sum_sugar;
+	if first.suppid then do; fruitdrink_sum_count=0; fruitdrink_sum_energy=0; fruitdrink_sum_weight=0; fruitdrink_sum_sugar=0; end;
+	fruitdrink_sum_count = sum(of SUGARFRUIT, fruitdrink_sum_count);
+	fruitdrink_sum_energy= sum(of E_SUGARFRUITDRINK, fruitdrink_sum_energy);
+	fruitdrink_sum_weight= sum(of W_SUGARFRUITDRINK, fruitdrink_sum_weight);
+	fruitdrink_sum_sugar= sum(of S_SUGARFRUITDRINK, fruitdrink_sum_sugar); 
+
+	retain milk_sum_count;
+	retain milk_sum_energy;
+	retain milk_sum_weight;
+	retain milk_sum_sugar;
+	if first.suppid then do; milk_sum_count=0; milk_sum_energy=0; milk_sum_weight=0; milk_sum_sugar=0; end;
+	milk_sum_count= sum(of SUGARMILK,  milk_sum_count);
+	milk_sum_energy= sum(of E_SUGARMILK, milk_sum_energy);
+	milk_sum_weight= sum(of W_SUGARMILK, milk_sum_weight);
+	milk_sum_sugar= sum(of S_SUGARMILK, milk_sum_sugar);
+
+	retain soda_sum_count;
+	retain soda_sum_energy;
+	retain soda_sum_weight;
+	retain soda_sum_sugar;
+	if first.suppid then do; soda_sum_count=0; soda_sum_energy=0; soda_sum_weight=0; soda_sum_sugar=0; end;
+	soda_sum_count= sum(of SUGARPOP, soda_sum_count);
+	soda_sum_energy= sum(of E_SUGARPOP, soda_sum_energy);
+	soda_sum_weight= sum(of W_SUGARPOP, soda_sum_weight);
+	soda_sum_sugar= sum(of S_SUGARPOP, soda_sum_sugar);
+
+	retain coffee_sum_count;
+	retain coffee_sum_energy;
+	retain coffee_sum_weight;
+	retain coffee_sum_sugar;
+	if first.suppid then do; coffee_sum_count=0; coffee_sum_energy=0; coffee_sum_weight=0; coffee_sum_sugar=0; end;
+	coffee_sum_count= sum (of SUGARCOFFEE, coffee_sum_count);
+	coffee_sum_energy= sum(of E_SUGARcoffee, coffee_sum_energy);
+	coffee_sum_weight= sum(of W_SUGARcoffee, coffee_sum_weight);
+	coffee_sum_sugar= sum(of S_SUGARcoffee, coffee_sum_sugar);
+
+	retain tea_sum_count;
+	retain tea_sum_energy;
+	retain tea_sum_weight;
+	retain tea_sum_sugar;
+	if first.suppid then do; tea_sum_count=0; tea_sum_energy=0; tea_sum_weight=0; tea_sum_sugar=0; end;
+	tea_sum_count= sum(of SUGARTEA, tea_sum_count);
+	tea_sum_energy= sum(of E_SUGARtea, tea_sum_energy);
+	tea_sum_weight= sum(of W_SUGARtea, tea_sum_weight);
+	tea_sum_sugar= sum(of S_SUGARtea, tea_sum_sugar);
+
+	retain sport_sum_count;
+	retain sport_sum_energy;
+	retain sport_sum_weight;
+	retain sport_sum_sugar;
+	if first.suppid then do; sport_sum_count=0; sport_sum_energy=0; sport_sum_weight=0; sport_sum_sugar=0; end;
+	sport_sum_count= sum (of SUGARSPORTS, sport_sum_count);
+	sport_sum_energy= sum(of E_SUGARsport, sport_sum_energy);
+	sport_sum_weight= sum(of W_SUGARsport, sport_sum_weight);
+	sport_sum_sugar= sum(of S_SUGARsport, sport_sum_sugar);
+
+	retain energy_sum_count;
+	retain energy_sum_energy;
+	retain energy_sum_weight;
+	retain energy_sum_sugar;
+	if first.suppid then do; energy_sum_count=0; energy_sum_energy=0; energy_sum_weight=0; energy_sum_sugar=0; end;
+	energy_sum_count= sum (of SUGARENERGY, energy_sum_count);
+	energy_sum_energy= sum(of E_SUGARenergy, energy_sum_energy);
+	energy_sum_weight= sum(of W_SUGARenergy, energy_sum_weight);
+	energy_sum_sugar= sum(of S_SUGARenergy, energy_sum_sugar);
+
+	retain vitwater_sum_count;
+	retain vitwater_sum_energy;
+	retain vitwater_sum_weight;
+	retain vitwater_sum_sugar;
+	if first.suppid then do; vitwater_sum_count=0; vitwater_sum_energy=0; vitwater_sum_weight=0; vitwater_sum_sugar=0; end;
+	vitwater_sum_count= sum(of SUGARVITAMINWATER, vitwater_sum_count);
+	vitwater_sum_energy= sum(of E_SUGARVITAMINWATER, vitwater_sum_energy);
+	vitwater_sum_weight= sum(of W_SUGARVITAMINWATER, vitwater_sum_weight);
+	vitwater_sum_sugar= sum(of S_SUGARVITAMINWATER, vitwater_sum_sugar);
+
+	retain plant_sum_count;
+	retain plant_sum_energy;
+	retain plant_sum_weight;
+	retain plant_sum_sugar;
+	if first.suppid then do; plant_sum_count=0; plant_sum_energy=0; plant_sum_weight=0; plant_sum_sugar=0; end;
+	plant_sum_count= sum (of SUGARPLANT, plant_sum_count);
+	plant_sum_energy= sum(of E_SUGARplant, plant_sum_energy);
+	plant_sum_weight= sum(of W_SUGARplant, plant_sum_weight);
+	plant_sum_sugar= sum(of S_SUGARplant, plant_sum_sugar);
+
+	retain yogurt_sum_count;
+	retain yogurt_sum_energy;
+	retain yogurt_sum_weight;
+	retain yogurt_sum_sugar;
+	if first.suppid then do; yogurt_sum_count=0; yogurt_sum_energy=0; yogurt_sum_weight=0; yogurt_sum_sugar=0; end;
+	yogurt_sum_count= sum(of SUGARYOGURT, yogurt_sum_count);
+	yogurt_sum_energy= sum(of E_SUGARyogurt, yogurt_sum_energy);
+	yogurt_sum_weight= sum(of W_SUGARyogurt, yogurt_sum_weight);
+	yogurt_sum_sugar= sum(of S_SUGARyogurt, yogurt_sum_sugar);
+
+	retain smoothie_sum_count;
+	retain smoothie_sum_energy;
+	retain smoothie_sum_weight;
+	retain smoothie_sum_sugar;
+	if first.suppid then do; smoothie_sum_count=0; smoothie_sum_energy=0; smoothie_sum_weight=0; smoothie_sum_sugar=0; end;
+	smoothie_sum_count= sum (of SUGARSMOOTHIE, smoothie_sum_count);
+	smoothie_sum_energy= sum(of E_SUGARsmoothie, smoothie_sum_energy);
+	smoothie_sum_weight= sum(of W_SUGARsmoothie, smoothie_sum_weight);
+	smoothie_sum_sugar= sum(of S_SUGARsmoothie, smoothie_sum_sugar);
+
+	retain hotchoc_sum_count;
+	retain hotchoc_sum_energy;
+	retain hotchoc_sum_weight;
+	retain hotchoc_sum_sugar;
+	if first.suppid then do; hotchoc_sum_count=0; hotchoc_sum_energy=0; hotchoc_sum_weight=0; hotchoc_sum_sugar=0; end;
+	hotchoc_sum_count= sum(of SUGARhotchoc, hotchoc_sum_count);
+	hotchoc_sum_energy= sum(of E_SUGARhotchoc, hotchoc_sum_energy);
+	hotchoc_sum_weight= sum(of W_SUGARhotchoc, hotchoc_sum_weight);
+	hotchoc_sum_sugar= sum(of S_SUGARhotchoc, hotchoc_sum_sugar);
+
+
+	RETAIN FID_EKC_SUM;
+	IF first.suppid THEN DO; FID_EKC_SUM=0; END;
+	FID_EKC_SUM= SUM(OF FID_EKC, FID_EKC_SUM);
+
+
+	RETAIN CPE_MILK_SUM_ENERGY;
+	IF first.suppid THEN DO; CPE_MILK_SUM_ENERGY=0; END;
+	CPE_MILK_SUM_ENERGY= SUM(OF CPE_MILK_ENERGY, CPE_MILK_SUM_ENERGY);
+
+	RETAIN CPE_DIETSODA_SUM_ENERGY;
+	IF first.suppid THEN DO; CPE_DIETSODA_SUM_ENERGY=0; END;
+	CPE_DIETSODA_SUM_ENERGY= SUM(OF CPE_DIETSODA_ENERGY, CPE_DIETSODA_SUM_ENERGY);
+
+	RETAIN CPE_DIETDRINKS_SUM_ENERGY;
+	IF first.suppid THEN DO; CPE_DIETDRINKS_SUM_ENERGY=0; END;
+	CPE_DIETDRINKS_SUM_ENERGY= SUM(OF CPE_DIETDRINKS_ENERGY, CPE_DIETDRINKS_SUM_ENERGY);
+
+	RETAIN CPE_ENERGY_SUM_TOTAL;
+	IF first.suppid THEN DO; CPE_ENERGY_SUM_TOTAL=0; END;
+	CPE_ENERGY_SUM_TOTAL= SUM(OF CPE_ENERGY_TOTAL, CPE_ENERGY_SUM_TOTAL);
+
+
+	if last.suppid then output;
+
+run;
+/*
+DATA TEST;
+	SET SCB_FID_FRL_sum;
+	KEEP ADM_RNO FID_EKC_SUM;
+RUN;
+*/
+
+
+/*look at the frequences of sugary drinks - total and by type
+
+data SCB_FID_FRL_sum;
+	set SCB_FID_FRL_sum;
+	if SSB_SUM_count > 0 then SSBcons=1; else SSBcons=0;
+	if FREESUG_SUM_count > 0 then FREESUGcons=1; else FREESUGcons=0;
+	if SCB_SUM_count > 0 then SCBcons=1; else SCBcons=0; 
+	if fruitdrink_sum_count > 0 then fruitdrinkcons=1; else fruitdrinkcons=0;
+	if Milk_sum_count > 0 then milkcons=1; else milkcons=0;
+	if soda_sum_count > 0 then sodacons=1; else sodacons=0;
+	if coffee_sum_count > 0 then coffeecons=1; else coffeecons=0;
+	if tea_sum_count > 0 then teacons=1; else teacons=0;
+	if sport_sum_count > 0 then sportcons=1; else sportcons=0;
+	if energy_sum_count > 0 then energycons=1; else energycons=0;
+	if vitwater_sum_count > 0 then vitwatercons=1; else vitwatercons=0;
+	if Plant_sum_count > 0 then plantcons=1; else plantcons=0;
+	if yogurt_sum_count > 0 then yogurtcons=1; else yogurtcons=0;
+	if smoothie_sum_count > 0 then smoothiecons=1; else smoothiecons=0; 
+	if hotchoc_sum_count > 0 then hotchoccons=1; else hotchoccons=0;
+run;
+/*
+proc freq data= SCB_FID_FRL_sum;
+	table SSBcons FREESUGcons SCBcons fruitdrinkcons milkcons sodacons coffeecons teacons
+		sportcons energycons vitwatercons plantcons yogurtcons smoothiecons hotchoccons;
+run;  
+
+proc means data=SCB_FID_FRL_sum mean median;
+	var SCB_sum_energy SCB_sum_weight
+		SSB_sum_energy SSB_sum_weight
+		freesug_sum_energy freesug_sum_weight;
+run;
+*/
+
+data SCB_FID_FRL_sumKEEP;
+	set SCB_FID_FRL_sum; 
+	keep 	
+	ADM_RNO SUPPID seq:
+
+	FID_EKC FID_EKC_SUM FID_SUG FID_WTG CDE_NEW cpe:
+	scb: ssb: freesug: fruitdrink: milk: soda: coffee: tea: sport: energy: vitwater: plant: yogurt: smoothie: hotchoc:
+	/*SSBcons FREESUGcons SCBcons fruitdrinkcons milkcons sodacons coffeecons teacons
+	sportcons energycons vitwatercons plantcons yogurtcons smoothiecons hotchoccons*/
+	;
+
+run;
+
+
+data SCB_FID_FRL_sumKEEP;
+	set SCB_FID_FRL_sumKEEP; 
+
+*SET PREVALENCE OUTCOMES;
+	SSByes=0;
+	if SSB_sum_count > 0 then SSByes=100; else SSByes=0;
+	SCByes=0;
+	if SCB_sum_count > 0 then SCByes=100; else SCByes=0;
+	JUICEYES=0;
+	IF FREESUG_SUM_COUNT > 0 THEN JUICEYES=100; ELSE JUICEYES=0;
+
+*SET TRANSFORMED ENERGY OUTCOMES;
+	sqrtssb_e=sqrt(SSB_sum_energy);
+
+	sqrtscb_e=sqrt(SCB_sum_energy);
+
+	SQRTJUICEENERGY=sqrt(freesug_sum_energy);
+
+	sqrtekc=sqrt(FID_EKC_SUM);
+RUN;
+
+/*********************
+END OF SCB VARIABLES
+*********************/
+
+
+/* CREATE PERMANENT DATASETS */
+
+DATA OUTPUT.STEP1_SUGARY_DERIVATION_NCI;
+	SET SCB_FID_FRL;
+RUN;
+
+DATA OUTPUT.STEP1_SUGARY_DERIVATION_NCI_SUM;
+	SET SCB_FID_FRL_sumKEEP;
+RUN;
+
+
+
+
+
+
